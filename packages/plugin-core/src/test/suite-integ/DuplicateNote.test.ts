@@ -10,6 +10,8 @@ import { expect } from "../testUtilsv2";
 import { DoctorUtils } from "../../components/doctor/utils";
 import { VaultUtils } from "@dendronhq/common-all";
 import sinon from "sinon";
+import { DoctorActionsEnum } from "@dendronhq/engine-server";
+import { DoctorCommand } from "../../commands/Doctor";
 
 suite("Duplicate note detection", function () {
   describeSingleWS(
@@ -51,8 +53,11 @@ suite("Duplicate note detection", function () {
       postSetupHook: ENGINE_HOOKS.setupBasic,
     },
     () => {
-      test("THEN duplicate note should not be detected", async () => {
-        const { wsRoot, vaults } = ExtensionProvider.getDWorkspace();
+      test("THEN Doctor Command should run to regenrate note id ", async () => {
+        const { wsRoot, vaults, engine } = ExtensionProvider.getDWorkspace();
+        const extension = ExtensionProvider.getExtension();
+        const cmd = new DoctorCommand(extension);
+        const doctorCmd = sinon.spy(cmd, "execute");
         const vaultPath = VaultUtils.getRelPath(vaults[0]);
         const barPath = path.join(wsRoot, vaultPath, "bar.md");
         const dupeNotePath = path.join(wsRoot, vaultPath, "bar-dupe.md");
@@ -72,6 +77,14 @@ suite("Duplicate note detection", function () {
           "dendron"
         );
         expect(showMessageStub.calledOnce).toBeTruthy();
+        const bar = (await engine.findNotes({ fname: "bar" }))[0];
+        expect(
+          doctorCmd.calledWith({
+            data: { note: bar },
+            action: DoctorActionsEnum.REGENERATE_NOTE_ID,
+            scope: "file",
+          })
+        );
       });
     }
   );
